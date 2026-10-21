@@ -1,0 +1,29 @@
+{
+  "name": "r-html",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "R HTML：本地与在线网页查看、元素选取和 HTML 编辑",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "postversion": "node scripts/sync-version.mjs"
+  },
+  "dependencies": {
+    "@codemirror/lang-html": "^6.4.12",
+    "@lezer/highlight": "^1.2.5",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.0.0",
+    "@tauri-apps/plugin-opener": "^2.0.0",
+    "@tauri-apps/plugin-process": "^2.0.0",
+    "@tauri-apps/plugin-updater": "^2.0.0",
+    "codemirror": "^6.0.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}

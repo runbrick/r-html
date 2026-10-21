@@ -1,0 +1,35 @@
+# 依赖
+node_modules/
+
+# 前端构建产物
+dist/
+dist-ssr/
+*.local
+
+# Rust / Tauri 构建产物
+src-tauri/target/
+src-tauri/gen/
+# Cargo.lock 是应用，需要提交，不要忽略
+
+# 签名密钥（绝不入库；公钥只写进 tauri.conf.json）
+*.key
+*.pub
+
+# 编辑器与系统
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

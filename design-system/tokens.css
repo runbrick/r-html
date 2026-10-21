@@ -1,0 +1,120 @@
+/* R 系列桌面软件的颜色、字体和基础控件。
+   主题切换：document.documentElement.dataset.theme = "light" | "dark" */
+
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --toolbar: #f7f8fa;
+  --panel: #ffffff;
+  --line: #e6e8eb;
+  --gutter: #f4f5f7;
+  --text: #1f2328;
+  --muted: #5b6470;
+  --faint: #8b949e;
+  --accent: #1677ff;
+  --accent-soft: #e8f1ff;
+  --node: #f6f8fa;
+  --node-border: #d8dee4;
+  --key: #0550ae;
+  --string: #0a7a3e;
+  --number: #b35c00;
+  --true: #0a7a3e;
+  --false: #c0392b;
+  --null: #8b949e;
+  --hover: rgba(22, 119, 255, 0.08);
+  --selected: #dbeafe;
+  --shadow: 0 8px 24px rgba(31, 35, 40, 0.08);
+  --mono: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-family: "Segoe UI", Inter, sans-serif;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1e1e1e;
+  --toolbar: #252526;
+  --panel: #1e1e1e;
+  --line: #3c3c3c;
+  --gutter: #252526;
+  --text: #d4d4d4;
+  --muted: #9da5b4;
+  --faint: #6e7681;
+  --accent: #4fc1ff;
+  --accent-soft: rgba(79, 193, 255, 0.14);
+  --node: #2b2c3e;
+  --node-border: #3d3e55;
+  --key: #9cdcfe;
+  --string: #ce9178;
+  --number: #b5cea8;
+  --true: #4ec9b0;
+  --false: #f14c4c;
+  --null: #808080;
+  --hover: rgba(255, 255, 255, 0.06);
+  --selected: rgba(79, 193, 255, 0.18);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+
+* { box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { border: 0; background: transparent; cursor: pointer; }
+button:disabled { opacity: 0.4; cursor: default; }
+
+.app {
+  display: grid;
+  grid-template-rows: 36px minmax(0, 1fr) 26px;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.titlebar, .statusbar {
+  display: flex;
+  background: var(--toolbar);
+  border-color: var(--line);
+  border-style: solid;
+}
+.titlebar {
+  height: 36px;
+  align-items: stretch;
+  justify-content: space-between;
+  border-width: 0 0 1px;
+  user-select: none;
+}
+.statusbar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  border-width: 1px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.menu-trigger, .cmd, .view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.menu-trigger { height: 100%; border-radius: 0; }
+.cmd:hover, .view-tab:hover, .menu-trigger:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.view-tab.active { color: var(--accent); background: var(--hover); }
+
+input, select {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  outline: none;
+  font-size: 12.5px;
+}
+input:focus, select:focus { border-color: var(--accent); }
