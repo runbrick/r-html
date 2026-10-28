@@ -27,6 +27,8 @@ export interface Editor {
   setDoc: (text: string) => void;
   setReadOnly: (readonly: boolean) => void;
   findAndSelect: (snippet: string) => boolean;
+  /** 单击（没有拖出选区）时回调光标在文档中的偏移。 */
+  onClick: (offset: number) => void;
 }
 
 export function createEditor(host: HTMLElement, onChange: () => void): Editor {
@@ -52,7 +54,7 @@ export function createEditor(host: HTMLElement, onChange: () => void): Editor {
     }),
   });
 
-  return {
+  const api: Editor = {
     view,
     getDoc: () => view.state.doc.toString(),
     setDoc: (text) => {
@@ -80,5 +82,18 @@ export function createEditor(host: HTMLElement, onChange: () => void): Editor {
       view.focus();
       return true;
     },
+    onClick: () => {},
   };
+
+  // mouseup 时选区已经更新：单击是空选区，拖选则跳过。
+  view.dom.addEventListener("mouseup", (event) => {
+    if (event.button !== 0) return;
+    const sel = view.state.selection.main;
+    if (!sel.empty) return;
+    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+    if (pos === null) return;
+    api.onClick(pos);
+  });
+
+  return api;
 }

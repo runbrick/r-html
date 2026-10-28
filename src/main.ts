@@ -11,6 +11,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { el, requireEl, setupMenus, showModal, confirmModal, statusFlash } from "./ui";
 import { createEditor } from "./editor";
 import { createPreview, type ElementInfo } from "./preview";
+import { elementPosAt } from "./source-map";
 
 // ---------- 状态 ----------
 
@@ -73,6 +74,10 @@ const editable = () => source.kind !== "online";
 // ---------- 预览 ----------
 
 let previewTimer = 0;
+let previewDoc = "";
+let previewReady = false;
+let pendingPos: number | null = null;
+
 function schedulePreview(): void {
   window.clearTimeout(previewTimer);
   previewTimer = window.setTimeout(refreshPreview, 400);
@@ -85,10 +90,22 @@ function baseHref(): string {
 }
 
 function refreshPreview(): void {
+  window.clearTimeout(previewTimer);
+  const doc = editor.getDoc();
+  if (previewReady && doc === previewDoc) return;
   preview.clearSelection();
   currentElement = null;
   renderElementPanel();
-  preview.load(editor.getDoc(), baseHref());
+  previewReady = false;
+  previewDoc = doc;
+  preview.load(previewDoc, baseHref());
+}
+
+function revealInPreview(pos: number): void {
+  switchTab("preview");
+  if (previewReady && previewDoc === editor.getDoc() && preview.reveal(pos)) return;
+  pendingPos = pos;
+  if (previewDoc !== editor.getDoc()) refreshPreview();
 }
 
 // ---------- 元素面板 ----------
@@ -204,10 +221,26 @@ function locateInSource(info: ElementInfo): void {
   statusFlash("未在源码中找到对应片段", true);
 }
 
-preview.onSelect = (info) => {
+preview.onSelect = (info, from) => {
   currentElement = info;
   renderElementPanel();
-  switchTab("element");
+  if (from !== "source") switchTab("element");
+};
+
+preview.onLoad = () => {
+  previewReady = true;
+  if (pendingPos === null) return;
+  const pos = pendingPos;
+  pendingPos = null;
+  preview.reveal(pos);
+};
+
+preview.takePending = () => pendingPos !== null;
+
+editor.onClick = (offset) => {
+  const pos = elementPosAt(editor.getDoc(), offset);
+  if (pos === null) return;
+  revealInPreview(pos);
 };
 
 preview.onOpenUrl = (url) => {

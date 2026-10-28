@@ -1,5 +1,6 @@
 // 预览 iframe 与元素选取桥：向 srcdoc 注入 base 与选取脚本，
 // 选中后把元素信息 postMessage 回主界面。
+import { annotateSourcePositions } from "./source-map";
 
 export interface ElementInfo {
   tag: string;
@@ -97,10 +98,11 @@ const BRIDGE = String.raw`
     var attrs = [];
     for (var i = 0; i < target.attributes.length; i++) {
       var a = target.attributes[i];
+      if (a.name === "data-rhtml-pos") continue;
       attrs.push({ name: a.name, value: a.value });
     }
     var r = target.getBoundingClientRect();
-    var html = target.outerHTML || "";
+    var html = (target.outerHTML || "").replace(/ data-rhtml-pos="\d+"/g, "");
     var gt = html.indexOf(">");
     var text = (target.textContent || "").replace(/\s+/g, " ").trim();
     return {
@@ -165,6 +167,16 @@ const BRIDGE = String.raw`
       if (selBox) selBox.style.display = "none";
       if (hovBox) hovBox.style.display = "none";
     }
+    if (d.__rhtml === "reveal") {
+      var node = document.querySelector('[data-rhtml-pos="' + d.pos + '"]');
+      if (!node) return;
+      sel = node;
+      ensure();
+      if (hovBox) hovBox.style.display = "none";
+      node.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+      place(selBox, node);
+      parent.postMessage({ __rhtml: "select", info: describe(node), from: "source" }, "*");
+    }
   });
   document.addEventListener("mouseleave", function () {
     if (hovBox) hovBox.style.display = "none";
@@ -189,7 +201,7 @@ function insertBase(html: string, baseHref: string): string {
 
 export function buildSrcdoc(html: string, baseHref: string): string {
   const script = `<script>\n${BRIDGE}\n</script>`;
-  const withBase = insertBase(html, baseHref);
+  const withBase = insertBase(annotateSourcePositions(html), baseHref);
   if (/<\/body\s*>/i.test(withBase)) {
     return withBase.replace(/<\/body\s*>/i, `${script}\n</body>`);
   }
@@ -200,8 +212,13 @@ export interface Preview {
   load: (html: string, baseHref: string) => void;
   setPickMode: (on: boolean) => void;
   clearSelection: () => void;
-  onSelect: (info: ElementInfo) => void;
+  /** 滚动并高亮 data-rhtml-pos 等于该偏移的元素。预览还没就绪时返回 false。 */
+  reveal: (pos: number) => boolean;
+  onSelect: (info: ElementInfo, from?: string) => void;
   onOpenUrl: (url: string) => void;
+  onLoad: () => void;
+  /** 这次加载完成后是否还要滚到某个元素。 */
+  takePending: () => boolean;
 }
 
 export function createPreview(iframe: HTMLIFrameElement): Preview {
@@ -214,19 +231,23 @@ export function createPreview(iframe: HTMLIFrameElement): Preview {
   };
 
   iframe.addEventListener("load", () => {
-    // srcdoc 重载后桥脚本重新注入，需要恢复状态和滚动位置
+    // srcdoc 重载后桥脚本重新注入，需要恢复选取状态和滚动位置。
+    // 接着就要滚到某个元素时，不再恢复旧位置。
     post({ __rhtml: "pick", on: pick });
-    try {
-      iframe.contentWindow?.scrollTo(0, savedScroll);
-    } catch {
-      /* 忽略跨源场景 */
+    if (!api.takePending()) {
+      try {
+        iframe.contentWindow?.scrollTo(0, savedScroll);
+      } catch {
+        /* 忽略跨源场景 */
+      }
     }
+    api.onLoad();
   });
 
   window.addEventListener("message", (e) => {
     const d = e.data;
-    if (!d || !d.__rhtml) return;
-    if (d.__rhtml === "select") api.onSelect(d.info as ElementInfo);
+    if (!d || !d.__rhtml || e.source !== iframe.contentWindow) return;
+    if (d.__rhtml === "select") api.onSelect(d.info as ElementInfo, d.from as string | undefined);
     if (d.__rhtml === "open-url") api.onOpenUrl(d.url as string);
   });
 
@@ -246,8 +267,15 @@ export function createPreview(iframe: HTMLIFrameElement): Preview {
     clearSelection: () => {
       post({ __rhtml: "clear" });
     },
+    reveal: (pos) => {
+      if (!iframe.contentWindow) return false;
+      post({ __rhtml: "reveal", pos });
+      return true;
+    },
     onSelect: () => {},
     onOpenUrl: () => {},
+    onLoad: () => {},
+    takePending: () => false,
   };
   return api;
 }
