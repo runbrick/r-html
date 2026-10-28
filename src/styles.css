@@ -20,7 +20,7 @@
 }
 .titlebar-drag { flex: 1; }
 
-.win-btns { display: flex; }
+.win-btns { display: flex; position: relative; z-index: 2; }
 .win-btn {
   width: 46px;
   height: 36px;
@@ -29,6 +29,7 @@
   justify-content: center;
   color: var(--muted);
   border-radius: 0;
+  -webkit-app-region: no-drag;
 }
 .win-btn svg {
   width: 10px;
@@ -38,6 +39,7 @@
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
+  pointer-events: none;
 }
 .win-btn:hover { background: var(--hover); color: var(--text); }
 .win-btn.close:hover { background: #e81123; color: #ffffff; }

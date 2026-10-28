@@ -56,7 +56,9 @@ const appWindow = getCurrentWindow();
 
 // ---------- DOM ----------
 
+let suppressDirty = false;
 const editor = createEditor(requireEl("editor"), () => {
+  if (suppressDirty) return;
   dirty = true;
   schedulePreview();
   renderStatus();
@@ -271,6 +273,17 @@ function updateAfterLoad(): void {
   refreshPreview();
 }
 
+function requestClose(): void {
+  if (allowClose || !dirty) {
+    void appWindow.destroy();
+    return;
+  }
+  confirmModal("未保存的更改", "当前文档未保存，确定要退出吗？", () => {
+    allowClose = true;
+    void appWindow.destroy();
+  });
+}
+
 function newDocument(force = false): void {
   if (!force && dirty) {
     confirmModal("未保存的更改", "当前文档未保存，新建将丢弃这些更改。", () =>
@@ -279,7 +292,9 @@ function newDocument(force = false): void {
     return;
   }
   source = { kind: "new" };
+  suppressDirty = true;
   editor.setDoc(NEW_TEMPLATE);
+  suppressDirty = false;
   updateAfterLoad();
 }
 
@@ -298,7 +313,9 @@ async function openLocalFile(path: string): Promise<void> {
       name: doc.name,
       baseHref: convertFileSrc(dirOf(doc.path)),
     };
+    suppressDirty = true;
     editor.setDoc(doc.content);
+    suppressDirty = false;
     updateAfterLoad();
     statusFlash(`已打开 ${doc.name}`);
   } catch (e) {
@@ -360,7 +377,9 @@ async function loadUrl(url: string): Promise<void> {
   try {
     const page = await invoke<PageDoc>("fetch_page", { url });
     source = { kind: "online", url: page.url, finalUrl: page.finalUrl };
+    suppressDirty = true;
     editor.setDoc(page.content);
+    suppressDirty = false;
     updateAfterLoad();
     statusFlash(`已加载 ${page.finalUrl}`);
   } catch (e) {
@@ -442,7 +461,7 @@ setupMenus(requireEl("menus"), [
         action: () => void saveFlow(true),
       },
       { sep: true },
-      { label: "退出", action: () => void appWindow.close() },
+      { label: "退出", action: requestClose },
     ],
   },
   {
@@ -506,14 +525,20 @@ function showAbout(): void {
 
 requireEl("win-min").addEventListener("click", () => void appWindow.minimize());
 requireEl("win-max").addEventListener("click", () => void appWindow.toggleMaximize());
-requireEl("win-close").addEventListener("click", () => void appWindow.close());
+requireEl("win-close").addEventListener("click", (e) => {
+  e.stopPropagation();
+  requestClose();
+});
 
-appWindow.onCloseRequested(async (e) => {
+// 系统关闭（Alt+F4 等）不走按钮。确认框必须在这里同步弹出：
+// Tauri 会等待这个 Promise，等它 resolve 后才执行 preventDefault，
+// 而弹框放在 await 之后就会来不及挂上 DOM。
+appWindow.onCloseRequested((e) => {
   if (allowClose || !dirty) return;
   e.preventDefault();
   confirmModal("未保存的更改", "当前文档未保存，确定要退出吗？", () => {
     allowClose = true;
-    void appWindow.close();
+    void appWindow.destroy();
   });
 });
 
