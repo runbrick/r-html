@@ -93,11 +93,17 @@ export interface ModalAction {
   action: () => void;
 }
 
+export interface ModalHandle {
+  body: HTMLElement;
+  close: () => void;
+  setActions: (actions: ModalAction[]) => void;
+}
+
 export function showModal(
   title: string,
   build: (body: HTMLElement, close: () => void) => void,
   actions: ModalAction[],
-): void {
+): ModalHandle {
   const mask = el("div", "modal-mask");
   const modal = el("div", "modal");
   modal.appendChild(el("div", "modal-title", title));
@@ -108,14 +114,18 @@ export function showModal(
   const close = () => mask.remove();
   build(body, close);
 
-  for (const a of actions) {
-    const btn = el("button", a.primary ? "primary" : "btn", a.label);
-    btn.addEventListener("click", () => {
-      close();
-      a.action();
-    });
-    foot.appendChild(btn);
-  }
+  const setActions = (next: ModalAction[]) => {
+    foot.replaceChildren();
+    for (const a of next) {
+      const btn = el("button", a.primary ? "primary" : "btn", a.label);
+      btn.addEventListener("click", () => {
+        close();
+        a.action();
+      });
+      foot.appendChild(btn);
+    }
+  };
+  setActions(actions);
   modal.appendChild(foot);
   mask.appendChild(modal);
   document.body.appendChild(mask);
@@ -127,6 +137,7 @@ export function showModal(
     if (e.key === "Escape" && document.body.contains(mask)) close();
   });
   (modal.querySelector("input") as HTMLInputElement | null)?.focus();
+  return { body, close, setActions };
 }
 
 export function confirmModal(title: string, message: string, onOk: () => void): void {

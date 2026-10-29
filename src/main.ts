@@ -91,16 +91,22 @@ function baseHref(): string {
   return "about:blank";
 }
 
-function refreshPreview(): void {
+function refreshPreview(force = false): void {
   window.clearTimeout(previewTimer);
   const doc = editor.getDoc();
-  if (previewReady && doc === previewDoc) return;
+  if (!force && previewReady && doc === previewDoc) return;
   preview.clearSelection();
   currentElement = null;
   renderElementPanel();
   previewReady = false;
   previewDoc = doc;
-  preview.load(previewDoc, baseHref());
+  preview.load(previewDoc, baseHref(), force ? Date.now() : undefined);
+}
+
+/** 工具栏、菜单和 Ctrl+R：先切到预览页，再强制重新加载。 */
+function reloadPreview(): void {
+  switchTab("preview");
+  refreshPreview(true);
 }
 
 function revealInPreview(pos: number): void {
@@ -468,7 +474,7 @@ setupMenus(requireEl("menus"), [
     label: "工具",
     entries: [
       { label: "选取元素", kbd: "Ctrl+Shift+C", action: () => setPickMode(!pickMode) },
-      { label: "重新加载预览", kbd: "Ctrl+R", action: refreshPreview },
+      { label: "重新加载预览", kbd: "Ctrl+R", action: reloadPreview },
       { sep: true },
       { label: "复制页面源码", action: () => void copyPageSource() },
     ],
@@ -485,23 +491,58 @@ setupMenus(requireEl("menus"), [
 // ---------- 更新与关于 ----------
 
 async function checkUpdates(silent: boolean): Promise<void> {
+  const dialog = silent
+    ? null
+    : showModal(
+        "检查更新",
+        (body) => body.appendChild(el("p", "", "正在检查更新…")),
+        [{ label: "关闭", action: () => {} }],
+      );
+  const setMessage = (message: string) => {
+    if (!dialog) {
+      statusFlash(message);
+      return;
+    }
+    dialog.body.replaceChildren(el("p", "", message));
+  };
+
   try {
     const update = await check();
     if (!update) {
-      if (!silent) statusFlash("已是最新版本");
+      setMessage("已是最新版本。");
       return;
     }
-    confirmModal("发现新版本", `版本 ${update.version} 可用，是否下载并安装？`, async () => {
-      try {
-        statusFlash("正在下载更新…");
-        await update.downloadAndInstall();
-        await relaunch();
-      } catch (e) {
-        statusFlash(`更新失败：${e}`, true);
-      }
-    });
+    if (!dialog) {
+      confirmModal("发现新版本", `版本 ${update.version} 可用，是否下载并安装？`, () =>
+        void installUpdate(update),
+      );
+      return;
+    }
+    setMessage(`版本 ${update.version} 可用，是否下载并安装？`);
+    dialog.setActions([
+      { label: "稍后", action: () => {} },
+      { label: "下载并安装", primary: true, action: () => void installUpdate(update) },
+    ]);
   } catch (e) {
-    if (!silent) statusFlash(`检查更新失败：${e}`, true);
+    const message = `检查更新失败：${e}`;
+    if (dialog) setMessage(message);
+    else if (!silent) statusFlash(message, true);
+  }
+}
+
+async function installUpdate(update: { version: string; downloadAndInstall: () => Promise<void> }): Promise<void> {
+  const dialog = showModal(
+    "检查更新",
+    (body) => body.appendChild(el("p", "", `正在下载并安装 ${update.version}…`)),
+    [],
+  );
+  try {
+    await update.downloadAndInstall();
+    dialog.body.replaceChildren(el("p", "", "安装完成，即将重新启动。"));
+    await relaunch();
+  } catch (e) {
+    dialog.body.replaceChildren(el("p", "", `更新失败：${e}`));
+    dialog.setActions([{ label: "关闭", primary: true, action: () => {} }]);
   }
 }
 
@@ -605,7 +646,7 @@ window.addEventListener("keydown", (e) => {
     s: () => void saveFlow(),
     "shift+s": () => void saveFlow(true),
     "shift+c": () => setPickMode(!pickMode),
-    r: refreshPreview,
+    r: reloadPreview,
   };
   const fn = handled[combo];
   if (fn) {
@@ -647,7 +688,7 @@ void getCurrentWebview().onDragDropEvent((event) => {
 requireEl("tb-open").addEventListener("click", () => void openFileFlow());
 requireEl("tb-url").addEventListener("click", () => openUrlFlow());
 requireEl("tb-save").addEventListener("click", () => void saveFlow());
-requireEl("tb-reload").addEventListener("click", refreshPreview);
+requireEl("tb-reload").addEventListener("click", reloadPreview);
 
 editor.setDoc(NEW_TEMPLATE);
 updateAfterLoad();

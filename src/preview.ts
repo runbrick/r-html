@@ -199,17 +199,19 @@ function insertBase(html: string, baseHref: string): string {
   return `${base}\n${html}`;
 }
 
-export function buildSrcdoc(html: string, baseHref: string): string {
+export function buildSrcdoc(html: string, baseHref: string, nonce?: number): string {
   const script = `<script>\n${BRIDGE}\n</script>`;
+  // 相同 srcdoc 再赋值不会重载，强制刷新时加一个不影响源码偏移的注释。
+  const marker = nonce === undefined ? "" : `\n<!-- rhtml-reload:${nonce} -->`;
   const withBase = insertBase(annotateSourcePositions(html), baseHref);
   if (/<\/body\s*>/i.test(withBase)) {
-    return withBase.replace(/<\/body\s*>/i, `${script}\n</body>`);
+    return withBase.replace(/<\/body\s*>/i, `${script}${marker}\n</body>`);
   }
-  return `${withBase}\n${script}`;
+  return `${withBase}\n${script}${marker}`;
 }
 
 export interface Preview {
-  load: (html: string, baseHref: string) => void;
+  load: (html: string, baseHref: string, nonce?: number) => void;
   setPickMode: (on: boolean) => void;
   clearSelection: () => void;
   /** 滚动并高亮 data-rhtml-pos 等于该偏移的元素。预览还没就绪时返回 false。 */
@@ -252,13 +254,13 @@ export function createPreview(iframe: HTMLIFrameElement): Preview {
   });
 
   api = {
-    load: (html, baseHref) => {
+    load: (html, baseHref, nonce) => {
       try {
         savedScroll = iframe.contentWindow?.scrollY ?? 0;
       } catch {
         savedScroll = 0;
       }
-      iframe.srcdoc = buildSrcdoc(html, baseHref);
+      iframe.srcdoc = buildSrcdoc(html, baseHref, nonce);
     },
     setPickMode: (on) => {
       pick = on;
