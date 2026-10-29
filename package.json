@@ -1,7 +1,7 @@
 {
   "name": "r-html",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "R HTML：本地与在线网页查看、元素选取和 HTML 编辑",
   "scripts": {
