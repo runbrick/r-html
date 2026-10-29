@@ -54,15 +54,22 @@ npm run tauri signer generate -- -w "$HOME\.tauri\r-json.key"
 
 ## 发布一个版本
 
-版本号只改 `package.json`。`tauri.conf.json` 通过 `"version": "../package.json"` 读取。`npm version` 会执行 `scripts/sync-version.mjs`，把同一版本写进 `src-tauri/Cargo.toml` 和 `Cargo.lock`。
+版本号只改 `package.json`。`tauri.conf.json` 通过 `"version": "../package.json"` 读取。`npm version` 提交前会执行 `scripts/sync-version.mjs`，把同一版本写进 `src-tauri/Cargo.toml` 和 `Cargo.lock`，并加入这次版本提交。
+
+一条命令完成升版本、提交、打 tag 并推送（推送 `v*` tag 后触发本工作流）：
 
 ```powershell
-npm version 0.2.0
-git push origin master
-git push origin v0.2.0
+npm run version
 ```
 
-也可以用 `npm version patch`、`npm version minor` 或 `npm version major`。它会改版本、提交，并打上 `v*` tag。
+默认是 `patch`。也可以指定级别或具体版本号：
+
+```powershell
+npm run version minor
+npm run version 0.2.0
+```
+
+工作区必须是干净的。命令会推送当前分支和 `v*` tag。只想在本地改版本、提交并打 tag、暂不推送时，用 `npm version patch`、`npm version minor`、`npm version major` 或 `npm version 0.2.0`。
 
 工作流结束后检查：
 

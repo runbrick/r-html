@@ -1,24 +1,51 @@
-// npm version 之后执行：把 package.json 的版本同步进 Cargo.toml 和 Cargo.lock。
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const { version } = JSON.parse(readFileSync("package.json", "utf8"));
+const rootDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const packageJsonPath = resolve(rootDirectory, "package.json");
+const cargoTomlPath = resolve(rootDirectory, "src-tauri", "Cargo.toml");
+const cargoLockPath = resolve(rootDirectory, "src-tauri", "Cargo.lock");
 
-const cargoPath = "src-tauri/Cargo.toml";
-const cargo = readFileSync(cargoPath, "utf8");
-const nextCargo = cargo.replace(
-  /(\[package\][^\0]*?^version = )"[^"]*"/m,
-  `$1"${version}"`,
-);
-if (cargo !== nextCargo) writeFileSync(cargoPath, nextCargo);
-
-const lockPath = "src-tauri/Cargo.lock";
-if (existsSync(lockPath)) {
-  const lock = readFileSync(lockPath, "utf8");
-  const nextLock = lock.replace(
-    /(\[\[package\]\]\nname = "r-html"\nversion = )"[^"]*"/,
-    `$1"${version}"`,
-  );
-  if (lock !== nextLock) writeFileSync(lockPath, nextLock);
+const appVersion = JSON.parse(readFileSync(packageJsonPath, "utf8")).version;
+if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(appVersion)) {
+  throw new Error(`Invalid app version in package.json: ${appVersion}`);
 }
 
-console.log(`synced version ${version}`);
+const replaceFirstMatch = (filePath, pattern, replacement, description) => {
+  const original = readFileSync(filePath, "utf8");
+  const matcher = new RegExp(pattern.source, pattern.flags);
+  if (!matcher.test(original)) {
+    throw new Error(`Could not find ${description} in ${filePath}`);
+  }
+  const updated = original.replace(new RegExp(pattern.source, pattern.flags), replacement);
+  if (updated !== original) {
+    writeFileSync(filePath, updated);
+  }
+};
+
+replaceFirstMatch(
+  cargoTomlPath,
+  /^version = "[^"]+"/m,
+  `version = "${appVersion}"`,
+  "package version",
+);
+replaceFirstMatch(
+  cargoLockPath,
+  /(\[\[package\]\]\r?\nname = "r-html"\r?\nversion = ")[^"]+(")/,
+  `$1${appVersion}$2`,
+  "lockfile package version",
+);
+
+const gitPaths = ["src-tauri/Cargo.toml", "src-tauri/Cargo.lock"];
+try {
+  execFileSync("git", ["add", "--", ...gitPaths], {
+    cwd: rootDirectory,
+    stdio: "inherit",
+  });
+} catch {
+  // npm version still succeeds if this is run outside a git checkout.
+}
+
+console.log(`Synced app version ${appVersion} to Cargo.toml and Cargo.lock`);
